@@ -4,28 +4,11 @@
     <meta charset="UTF-8" />
     <title>1 Million Checkboxes</title>
     <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background: #121212;
-        font-family: sans-serif;
-      }
+      body { margin: 0; overflow: hidden; background: #121212; font-family: sans-serif; }
       #adminBtn {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 100;
-        padding: 10px 20px;
-        background: #dc2626;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-      #adminBtn:hover {
-        background: #b91c1c;
+        position: fixed; top: 20px; left: 20px; z-index: 100;
+        padding: 10px 20px; background: #dc2626; color: white;
+        border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
       }
     </style>
   </head>
@@ -39,75 +22,116 @@
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
 
+      const myName = prompt("What is your name?") || "Anonymous";
+
       const TOTAL_BOXES = 1000000;
       const BOX_SIZE = 24;
       const COLUMNS = 1000;
       let checkboxState = new Uint8Array(125000);
       let hoveredIndex = -1;
+      
+      // Floating names: { x, y, startY, name, startTime }
+      let activeNames = [];
+      const ANIM_DURATION = 2000; // 2 seconds
 
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    for (let i = 0; i < TOTAL_BOXES; i++) {
-        const x = (i % COLUMNS) * BOX_SIZE;
-        const y = Math.floor(i / COLUMNS) * BOX_SIZE;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const now = Date.now();
 
-        if (x > canvas.width || y > canvas.height) continue;
+        // 1. Draw Checkboxes
+        for (let i = 0; i < TOTAL_BOXES; i++) {
+          const x = (i % COLUMNS) * BOX_SIZE;
+          const y = Math.floor(i / COLUMNS) * BOX_SIZE;
 
-        const isChecked = checkboxState[Math.floor(i / 8)] & (1 << (i % 8));
-        const isHovered = (i === hoveredIndex);
+          if (x > canvas.width || y > canvas.height) continue;
 
-        const padding = 3;
-        const rectSize = BOX_SIZE - (padding * 2);
+          const isChecked = checkboxState[Math.floor(i / 8)] & (1 << (i % 8));
+          const isHovered = (i === hoveredIndex);
 
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(x + padding, y + padding, rectSize, rectSize, 4);
-        } else {
-            ctx.rect(x + padding, y + padding, rectSize, rectSize);
-        }
-        
-        if (isChecked) {
+          ctx.beginPath();
+          ctx.roundRect(x + 3, y + 3, 18, 18, 4);
+          
+          if (isChecked) {
             ctx.fillStyle = '#3b82f6'; 
             ctx.fill();
-            
             ctx.beginPath();
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.moveTo(x + 8, y + 12);
-            ctx.lineTo(x + 11, y + 15);
-            ctx.lineTo(x + 16, y + 9);
+            ctx.lineWidth = 2;
+            ctx.moveTo(x + 8, y + 12); ctx.lineTo(x + 11, y + 15); ctx.lineTo(x + 16, y + 9);
             ctx.stroke();
-        } else {
+          } else {
             ctx.fillStyle = isHovered ? '#334155' : '#1e293b'; 
             ctx.fill();
+          }
         }
-    }
-}
+
+        // 2. Draw & Animate Floating Names
+        activeNames = activeNames.filter(item => {
+          const elapsed = now - item.startTime;
+          if (elapsed > ANIM_DURATION) return false;
+
+          // Animation Progress (0 to 1)
+          const progress = elapsed / ANIM_DURATION;
+          
+          // Style calculations
+          const opacity = 1 - progress; // Fade out
+          const currentY = item.startY - (progress * 30); // Float up 30 pixels
+
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.font = "bold 12px sans-serif";
+          ctx.textAlign = "center";
+          
+          // Draw a small pill background
+          const textWidth = ctx.measureText(item.name).width;
+          ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+          ctx.beginPath();
+          ctx.roundRect(item.x - (textWidth/2) - 6, currentY - 14, textWidth + 12, 20, 10);
+          ctx.fill();
+
+          // Draw the name
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(item.name, item.x, currentY);
+          ctx.restore();
+
+          return true;
+        });
+
+        // Always running the loop for smooth animation
+        requestAnimationFrame(draw);
+      }
+
+      // Start the loop
+      requestAnimationFrame(draw);
 
       socket.on("full_state", (data) => {
         checkboxState = new Uint8Array(data);
-        draw();
       });
+
       socket.on("update", (data) => {
         const byte = Math.floor(data.index / 8);
         const bit = data.index % 8;
         if (data.checked) checkboxState[byte] |= 1 << bit;
         else checkboxState[byte] &= ~(1 << bit);
-        draw();
+        
+        const x = (data.index % COLUMNS) * BOX_SIZE;
+        const y = Math.floor(data.index / COLUMNS) * BOX_SIZE;
+
+        activeNames.push({
+          x: x + (BOX_SIZE / 2),
+          startY: y - 5,
+          name: data.username || "Someone",
+          startTime: Date.now()
+        });
       });
-      socket.on("error_message", (msg) => alert(msg));
 
       canvas.onmousemove = (e) => {
         const col = Math.floor(e.clientX / BOX_SIZE);
         const row = Math.floor(e.clientY / BOX_SIZE);
         hoveredIndex = row * COLUMNS + col;
-        draw();
       };
 
       canvas.onclick = (e) => {
@@ -116,18 +140,8 @@ function draw() {
         const index = row * COLUMNS + col;
 
         if (index >= 0 && index < TOTAL_BOXES) {
-          const isChecked = !(
-            checkboxState[Math.floor(index / 8)] &
-            (1 << (index % 8))
-          );
-
-          const byte = Math.floor(index / 8);
-          const bit = index % 8;
-          if (isChecked) checkboxState[byte] |= 1 << bit;
-          else checkboxState[byte] &= ~(1 << bit);
-
-          draw();
-          socket.emit("toggle", { index, checked: isChecked });
+          const isChecked = !(checkboxState[Math.floor(index / 8)] & (1 << (index % 8)));
+          socket.emit("toggle", { index, checked: isChecked, username: myName });
         }
       };
 
@@ -139,7 +153,6 @@ function draw() {
       window.onresize = () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        draw();
       };
     </script>
   </body>
