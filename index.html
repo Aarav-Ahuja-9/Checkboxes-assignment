@@ -128,6 +128,10 @@
         });
       });
 
+      socket.on("error_message", (msg) => {
+    alert(msg); 
+});
+
       canvas.onmousemove = (e) => {
         const col = Math.floor(e.clientX / BOX_SIZE);
         const row = Math.floor(e.clientY / BOX_SIZE);

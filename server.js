@@ -49,15 +49,15 @@ io.on('connection', (socket) => {
     });
 
     // Handle Admin Reset
-    socket.on('reset_all', (data) => {
-        if (data.password === ADMIN_PASSWORD) {
-            checkboxState.fill(0);
-            io.emit('full_state', checkboxState);
-            console.log("Board cleared by admin");
-        } else {
-            socket.emit('error_message', "Wrong password!");
-        }
-    });
+        socket.on('reset_all', (data) => {
+            if (data.password === ADMIN_PASSWORD) {
+                checkboxState.fill(0);
+                io.emit('full_state', checkboxState);
+                console.log("Board cleared by admin");
+            } else {
+                socket.emit('error_message', "Good try! you are NOT the admin.");
+            }
+        });
 
     socket.on('disconnect', () => {
         console.log('User disconnected');
