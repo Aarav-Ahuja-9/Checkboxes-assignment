@@ -11,7 +11,7 @@ const io = new Server(server);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "fallback_password"; 
 const TOTAL_BOXES = 1000000;
 // 1,000,000 bits = 125,000 bytes
-const checkboxState = Buffer.alloc(Math.ceil(TOTAL_BOXES / 8), 0);
+const checkboxState = Buffer.alloc(Math.ceil(   TOTAL_BOXES / 8), 0);
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
